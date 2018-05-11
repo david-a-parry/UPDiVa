@@ -61,10 +61,12 @@ def main(vcf, ped=None, threads=1, progress_interval=10000):
             raise RuntimeError("No valid contigs identified in {}".format(fai))
         with mp.Pool(threads) as p:
             results = p.map(_process_runner, zip(contig_args, repeat(get_args)))
+        logger = get_logger()
     else:
         logger = get_logger()
         results = [get_gt_counts(vcf=vcf, ped=ped, logger=logger,
                                  prog_interval=progress_interval)]
+    logger.info("Collating and parsing results.")
     parse_results(sum(results), ped)
 
 def parse_results(gt_counts, count_upd=True):
@@ -74,6 +76,7 @@ def parse_results(gt_counts, count_upd=True):
     gt_indices = dict((r, n) for n,r in enumerate(gt_ids))
     print("\t".join(["Sample", "Chrom", "GT", "N", "Calls", "vs_chrom",
                      "vs_genome", "vs_self"]))
+    logger.info("Calculating genomewide total")
     genome_total = np.sum(genomewide_counts[:3])
     for chrom in gt_counts.counts:
         if "X" in chrom:
@@ -84,6 +87,7 @@ def parse_results(gt_counts, count_upd=True):
         for gt in gt_ids:
             if not count_upd and gt.endswith("_upd"):
                 continue
+            logger.info("Parsing {} results for chomosome {}".format(gt,chrom))
             genome_count = np.sum(genomewide_counts[gt_indices[gt]])
             chrom_count = np.sum(gt_counts.counts[chrom][gt_indices[gt]])
             for sample in gt_counts.samples:
