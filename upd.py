@@ -74,24 +74,24 @@ def parse_results(gt_counts, count_upd=True):
     gt_indices = dict((r, n) for n,r in enumerate(gt_ids))
     print("\t".join(["Sample", "Chrom", "GT", "N", "Calls", "vs_chrom",
                      "vs_genome", "vs_self"]))
-    for sample in gt_counts.samples:
-        i = gt_counts.samp_indices[sample]
-        for chrom in gt_counts.counts:
-            if "X" in chrom:
+    genome_total = np.sum(genomewide_counts[:3])
+    for chrom in gt_counts.counts:
+        if "X" in chrom:
+            continue
+        #only het/hom-ref/hom-alt - don't want to count UPD as these are
+        #included in hom calls
+        chrom_total = np.sum(gt_counts.counts[chrom][:3])
+        for gt in gt_ids:
+            if not count_upd and gt.endswith("_upd"):
                 continue
-            #only het/hom-ref/hom-alt - don't want to count UPD as these are
-            #included in hom calls
-            genome_total = np.sum(genomewide_counts[:3])
-            chrom_total = np.sum(gt_counts.counts[chrom][:3])
-            samp_totals = np.sum(x[:,i] for x in gt_counts.counts.values())
-            samp_genomewide_total = np.sum(samp_totals[:3])
-            samp_chrom_total = np.sum(gt_counts.counts[chrom][:3,i])
-            for gt in gt_ids:
-                if not count_upd and gt.endswith("_upd"):
-                    continue
+            genome_count = np.sum(genomewide_counts[gt_indices[gt]])
+            chrom_count = np.sum(gt_counts.counts[chrom][gt_indices[gt]])
+            for sample in gt_counts.samples:
+                i = gt_counts.samp_indices[sample]
+                samp_totals = np.sum(x[:,i] for x in gt_counts.counts.values())
+                samp_genomewide_total = np.sum(samp_totals[:3])
+                samp_chrom_total = np.sum(gt_counts.counts[chrom][:3,i])
                 samp_count = gt_counts.counts[chrom][gt_indices[gt],i]
-                genome_count = np.sum(genomewide_counts[gt_indices[gt]])
-                chrom_count = np.sum(gt_counts.counts[chrom][gt_indices[gt]])
                 samp_vs_chrom = scipy.stats.binom_test(samp_count,
                                                        samp_chrom_total,
                                                        chrom_count/chrom_total,
