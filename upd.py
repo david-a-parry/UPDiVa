@@ -67,9 +67,9 @@ def main(vcf, ped=None, threads=1, progress_interval=10000):
         results = [get_gt_counts(vcf=vcf, ped=ped, logger=logger,
                                  prog_interval=progress_interval)]
     logger.info("Collating and parsing results.")
-    parse_results(sum(results), ped)
+    parse_results(sum(results), logger, ped)
 
-def parse_results(gt_counts, count_upd=True):
+def parse_results(gt_counts, logger, count_upd=True):
     #TODO - address chrX in females
     genomewide_counts = sum(gt_counts.counts[c] for c in gt_counts.counts if
                             "X" not in c)
@@ -145,6 +145,7 @@ def get_logger(loglevel=logging.INFO, logfile=None):
         fh.setLevel(logger.level)
         fh.setFormatter(formatter)
         logger.addHandler(fh)
+    return logger
 
 def initialize_mp_logger(logger, loglevel, logfile=None):
     logger.setLevel(loglevel)
