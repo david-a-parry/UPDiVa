@@ -263,9 +263,9 @@ def upd(gts, sample, mother, father):
             if gts['GT'][father] == (comb[1], comb[1]):
                 if comb[0] in gts['GT'][mother]:
                     return 'mat_upd'
-                elif gts['GT'][mother] == (comb[1], comb[1]):
-                    if comb[0] in gts['GT'][father]:
-                        return 'pat_upd'
+            elif gts['GT'][mother] == (comb[1], comb[1]):
+                if comb[0] in gts['GT'][father]:
+                    return 'pat_upd'
     return False
 
 def get_parser():
