@@ -117,11 +117,14 @@ def data_to_plots(sample_file, pos_file, out_dir, min_fraction, window_size,
 def main(sample_file, coordinate_table, output_directory, min_fraction=0.05,
          window_size=1e6, self_significance_cutoff=1e-5,
          chrom_significance_cutoff=1e-5, samples=[], chromosomes=[],
-         context='talk', marker=None):
+         context='talk', marker=None, force=False):
     sns.set_context(context)
     sns.set_style('darkgrid')
-    if not os.path.exists(output_directory):
+    if not os.path.isdir(output_directory):
         os.mkdir(output_directory)
+    elif not force:
+        sys.exit("Output directory '{}' exists ".format(output_directory) +
+                 "- use --force to overwrite")
     data_to_plots(sample_file, coordinate_table, output_directory,
                   min_fraction, window_size, self_significance_cutoff,
                   chrom_significance_cutoff, samples, chromosomes, marker)
@@ -164,6 +167,8 @@ def get_parser():
     parser.add_argument("-m", "--marker", help='''Use this marker style for
                         individual points in plots. Default=None (no markers).
                         Valid values are as per matplotlib.''')
+    parser.add_argument("--force", action='store_true', help='''Overwrite
+                        existing output directories.''')
     return parser
 
 if __name__ == '__main__':
