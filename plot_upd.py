@@ -5,6 +5,7 @@ import argparse
 import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FormatStrFormatter
 import matplotlib
 from collections import defaultdict
 
@@ -36,6 +37,7 @@ def states_per_region(df, chrom, sample, w=1000000 ):
             counts['State'].append(state)
             counts['Frac'].append(f)
             counts['Pos'].append((i-w)/1e6)
+            counts['Calls'].append(len(window))
     return pd.DataFrame(counts)
 
 def plot_upd(df, sample, chrom, out_dir, w=1000000, fig_dimensions=(12, 6),
@@ -48,19 +50,42 @@ def plot_upd(df, sample, chrom, out_dir, w=1000000, fig_dimensions=(12, 6),
                          "chromosome {}".format(chrom))
         return
     colors = sns.color_palette("Paired", len(valid_states))
-    plt.figure(figsize=fig_dimensions)
-    fig, ax = plt.subplots()
+    fig = plt.figure(figsize=fig_dimensions)
+    suptitle = fig.suptitle("{} {}".format(sample, chrom))
+    grid = plt.GridSpec(2, 2, wspace=0.4, hspace=0.3)
+    fig.add_subplot(grid[0, 1],)
+    plt.plot(states.Pos, states.Calls, color='red', marker=marker,
+             label="Calls per {:g} bp".format(w))
+    plt.title("Calls per Window")
+    plt.ylabel("Calls")
+    plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    fig.add_subplot(grid[1, 1],)
     for i in range(len(valid_states)):
         s = states[states.State == valid_states[i]]
-        ax.plot(s.Pos, s.Frac, color=colors[i], label=lbls[valid_states[i]])
+        plt.plot(s.Pos, s.Frac, color=colors[i],
+                 label=lbls[valid_states[i]],  marker=marker)
+    plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    plt.title("States")
+    plt.xlabel("Pos (Mb)")
+    plt.ylabel("Fraction")
+    pivot = states.pivot("State", "Pos", "Calls")
+    fig.add_subplot(grid[0, 0],)
+    ax = sns.heatmap(pivot)
+    ax.set_title("Calls per Window")
+    ax.xaxis.set_visible(False)
+    ax.yaxis.set_visible(False)
+    majorFormatter = FormatStrFormatter('%.2f')
+    fig.add_subplot(grid[1, 0],)
+    pivot = states.pivot("State", "Pos", "Frac")
+    ax = sns.heatmap(pivot)
+    ax.set_title("States")
+    majorFormatter = FormatStrFormatter('%.2f')
+    ax.xaxis.set_major_formatter(majorFormatter)
     handles, labels = ax.get_legend_handles_labels()
     lgd = ax.legend(handles, labels, bbox_to_anchor=(1.05, 1), loc=2,
                     borderaxespad=0.)
-    plt.title("{} {}".format(sample, chrom))
-    plt.xlabel("Pos (Mb)")
-    plt.ylabel("Fraction")
     fig.savefig(os.path.join(out_dir, "{}_{}.png".format(chrom, sample)),
-                bbox_extra_artists=(lgd,), bbox_inches='tight')
+                bbox_extra_artists=(lgd, suptitle), bbox_inches='tight')
     plt.cla()
     plt.close('all')
 
@@ -145,4 +170,3 @@ if __name__ == '__main__':
     argparser = get_parser()
     args = argparser.parse_args()
     main(**vars(args))
-
