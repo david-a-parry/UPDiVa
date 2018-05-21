@@ -79,8 +79,11 @@ def plot_upd(df, sample, chrom, out_dir, w=1000000, fig_dimensions=(12, 6),
     pivot = states.pivot("State", "Pos", "Frac")
     ax = sns.heatmap(pivot)
     ax.set_title("States")
-    majorFormatter = FormatStrFormatter('%.2f')
-    ax.xaxis.set_major_formatter(majorFormatter)
+    xticklabels = []
+    for item in ax.get_xticklabels():
+        item.set_text(fmt.format(float(item.get_text())))
+        xticklabels += [item]
+    ax.set_xticklabels(xticklabels)
     handles, labels = ax.get_legend_handles_labels()
     lgd = ax.legend(handles, labels, bbox_to_anchor=(1.05, 1), loc=2,
                     borderaxespad=0.)
