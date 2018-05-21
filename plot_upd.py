@@ -5,7 +5,6 @@ import argparse
 import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib.ticker import FormatStrFormatter
 import matplotlib
 from collections import defaultdict
 
@@ -32,11 +31,14 @@ def states_per_region(df, chrom, sample, w=1000000 ):
             if state == 'mat_a_upd':
                 f = len(window[(window.state == state) |
                                (window.state == 'mat_i_upd')])/len(window)
+            if state == 'pat_a_upd':
+                f = len(window[(window.state == state) |
+                               (window.state == 'pat_i_upd')])/len(window)
             else:
                 f = len(window[window.state == state])/len(window)
             counts['State'].append(state)
             counts['Frac'].append(f)
-            counts['Pos'].append((i-w)/1e6)
+            counts['Pos'].append((window.pos.min() + window.pos.max())/2e6)
             counts['Calls'].append(len(window))
     return pd.DataFrame(counts)
 
@@ -74,15 +76,14 @@ def plot_upd(df, sample, chrom, out_dir, w=1000000, fig_dimensions=(12, 6),
     ax.set_title("Calls per Window")
     ax.xaxis.set_visible(False)
     ax.yaxis.set_visible(False)
-    majorFormatter = FormatStrFormatter('%.2f')
     fig.add_subplot(grid[1, 0],)
     pivot = states.pivot("State", "Pos", "Frac")
     ax = sns.heatmap(pivot)
     ax.set_title("States")
     xticklabels = []
-    for item in ax.get_xticklabels():
-        item.set_text(fmt.format(float(item.get_text())))
-        xticklabels += [item]
+    for it in ax.get_xticklabels():
+        it.set_text('{:0.2f}'.format(float(it.get_text())))
+        xticklabels += [it]
     ax.set_xticklabels(xticklabels)
     handles, labels = ax.get_legend_handles_labels()
     lgd = ax.legend(handles, labels, bbox_to_anchor=(1.05, 1), loc=2,
