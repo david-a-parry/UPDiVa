@@ -31,7 +31,7 @@ def states_per_region(df, chrom, sample, w=1000000 ):
             if state == 'mat_a_upd':
                 f = len(window[(window.state == state) |
                                (window.state == 'mat_i_upd')])/len(window)
-            if state == 'pat_a_upd':
+            elif state == 'pat_a_upd':
                 f = len(window[(window.state == state) |
                                (window.state == 'pat_i_upd')])/len(window)
             else:
@@ -85,6 +85,7 @@ def plot_upd(df, sample, chrom, out_dir, w=1000000, fig_dimensions=(12, 6),
         it.set_text('{:0.2f}'.format(float(it.get_text())))
         xticklabels += [it]
     ax.set_xticklabels(xticklabels)
+    ax.set_xlabel("Pos (Mb)")
     handles, labels = ax.get_legend_handles_labels()
     lgd = ax.legend(handles, labels, bbox_to_anchor=(1.05, 1), loc=2,
                     borderaxespad=0.)
