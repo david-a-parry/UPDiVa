@@ -61,7 +61,7 @@ def _process_runner(tup):
     kwargs2.update(kwargs1)
     return get_gt_counts(**kwargs2)
 
-def main(vcf, ped=None, coordinate_table=None, threads=1,
+def main(vcf, ped=None, output=None, coordinate_table=None, threads=1,
          progress_interval=10000):
     parents = None
     children = set()
@@ -76,9 +76,9 @@ def main(vcf, ped=None, coordinate_table=None, threads=1,
         logger.info("No PED file - analyzing all samples for homozygosity " +
                     "only")
         samples = VcfReader(vcf).header.samples
-    kwargs = {'vcf': vcf, 'prog_interval': progress_interval,
-              'coordinate_table': coordinate_table, 'samples': samples,
-              'parents': parents, 'children': children}
+        kwargs = {'vcf': vcf, 'prog_interval': progress_interval,
+                  'coordinate_table': coordinate_table, 'samples': samples,
+                  'parents': parents, 'children': children}
     if threads > 1:
         contig_args = ({'contig': x} for x in get_seq_ids(vcf))
         if not contig_args:
@@ -102,16 +102,20 @@ def main(vcf, ped=None, coordinate_table=None, threads=1,
         if coordinate_table:
             copyfile(tmp_table, coordinate_table)
     logger.info("Parsing results.")
-    parse_results(results, logger, children)
+    parse_results(results, logger, children, output)
 
-def parse_results(gt_counts, logger, children):
+def parse_results(gt_counts, logger, children, output=None):
     #TODO - address chrX in females
+    if output is None:
+        out = sys.stdout
+    else:
+        out = open(output, wt)
     genomewide_counts = sum(gt_counts.counts[c] for c in gt_counts.counts if
                             "X" not in c)
     gt_indices = dict((r, n) for n,r in enumerate(gt_ids))
     upd_types = ('mat_upd', 'mat_i_upd', 'pat_upd', 'pat_i_upd')
-    print("\t".join(["Sample", "Chrom", "Test", "N", "Calls", "Fraction",
-                     "vs_chrom", "vs_self"]))
+    out.write("\t".join(["Sample", "Chrom", "Test", "N", "Calls", "Fraction",
+                     "vs_chrom", "vs_self"]) + "\n")
     logger.info("Calculating genomewide total")
     genome_all_total = np.sum(genomewide_counts[:2]) #does not include hom-ref
     het_i = gt_indices['het'] #for readability
@@ -144,10 +148,10 @@ def parse_results(gt_counts, logger, children):
                     samp_hom_total/samp_genomewide_total,
                     alternative='greater')
             frac = "{:.3g}".format(samp_chrom_hom/samp_chrom_total)
-            print("\t".join(str(x) for x in [sample, chrom, 'Homozygosity',
+            out.write("\t".join(str(x) for x in [sample, chrom, 'Homozygosity',
                                              samp_chrom_hom, samp_chrom_total,
                                              frac, samp_vs_chrom,
-                                             samp_vs_self]))
+                                             samp_vs_self]) + "\n")
             if sample in children:
                 samp_informative_total = np.sum(np.sum(genomewide_counts[3:,i]))
                 samp_chrom_informative = np.sum(gt_counts.counts[chrom][3:,i])
@@ -173,11 +177,11 @@ def parse_results(gt_counts, logger, children):
                                 alternative='greater')
                     frac = "{:.3g}".format(
                             samp_upd_chrom[utype]/samp_chrom_informative)
-                    print("\t".join(str(x) for x in [sample, chrom, utype,
+                    out.write("\t".join(str(x) for x in [sample, chrom, utype,
                                                      samp_upd_chrom[utype],
                                                      samp_chrom_informative,
                                                      frac, samp_vs_chrom,
-                                                     samp_vs_self]))
+                                                     samp_vs_self]) + "\n")
 
 def get_upd_counts(counts, gt_rows):
     '''
@@ -387,20 +391,27 @@ def upd(gts, sample, mother, father):
 def get_parser():
     parser = argparse.ArgumentParser(
                   description='Identify putative UPD chromosomes in samples.')
-    parser.add_argument("-i", "--vcf", "--input", required=True,
-                        help="Input VCF file.")
-    parser.add_argument("-p", "--ped", help='''PED file detailing any familial
-                        relationships for samples in VCF.''')
-    parser.add_argument("-t", "--threads", type=int, default=1, help='''Number
-                         of threads to use. Default=1. Maximum will be
-                        determined by the number of chromosomes in your
-                        reference.''')
-    parser.add_argument("-c", "--coordinate_table", help='''Optional output
-                        file for table of sample coordinates and UPD/non-UPD
-                        sites.''')
-    parser.add_argument("--progress_interval", type=int, default=10000,
-                        metavar='N', help='''Report progress every N
-                        variants.''')
+    required_args = parser.add_argument_group('Required Arguments')
+    optional_args = parser.add_argument_group('Required Arguments')
+    required_args.add_argument("-i", "--vcf", "--input", required=True,
+                               help="Input VCF file.")
+    optional_args.add_argument("-p", "--ped", help='''PED file detailing any
+                               familial relationships for samples in VCF. If
+                               no PED file is provided samples will be analyzed
+                               for excess homozygosity only.''')
+    optional_args.add_argument("-o", "--output", help='''Write summary output
+                               data to this file. Defaults to STDOUT.''')
+    optional_args.add_argument("-c", "--coordinate_table", help='''Output file
+                               for table of sample coordinates and UPD/non-UPD
+                               sites. Required if you want to create plots
+                               after running this program.''')
+    optional_args.add_argument("-t", "--threads", type=int, default=1,
+                               help='''Number of threads to use. Default=1.
+                               Maximum will be determined by the number of
+                               chromosomes in your reference.''')
+    optional_args.add_argument("--progress_interval", type=int, default=10000,
+                               metavar='N', help='''Report progress every N
+                               variants.''')
     return parser
 
 if __name__ == '__main__':
