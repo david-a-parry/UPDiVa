@@ -76,9 +76,9 @@ def main(vcf, ped=None, output=None, coordinate_table=None, threads=1,
         logger.info("No PED file - analyzing all samples for homozygosity " +
                     "only")
         samples = VcfReader(vcf).header.samples
-        kwargs = {'vcf': vcf, 'prog_interval': progress_interval,
-                  'coordinate_table': coordinate_table, 'samples': samples,
-                  'parents': parents, 'children': children}
+    kwargs = {'vcf': vcf, 'prog_interval': progress_interval,
+              'coordinate_table': coordinate_table, 'samples': samples,
+              'parents': parents, 'children': children}
     if threads > 1:
         contig_args = ({'contig': x} for x in get_seq_ids(vcf))
         if not contig_args:
@@ -109,7 +109,7 @@ def parse_results(gt_counts, logger, children, output=None):
     if output is None:
         out = sys.stdout
     else:
-        out = open(output, wt)
+        out = open(output, 'wt')
     genomewide_counts = sum(gt_counts.counts[c] for c in gt_counts.counts if
                             "X" not in c)
     gt_indices = dict((r, n) for n,r in enumerate(gt_ids))
