@@ -2,10 +2,12 @@
 import sys
 import os
 import argparse
+import matplotlib
+if os.environ.get('DISPLAY','') == '':
+    matplotlib.use('Agg') #for headless servers
+import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib
 from collections import defaultdict
 
 valid_states = ['mat_i_upd', 'mat_a_upd', 'pat_i_upd', 'pat_a_upd', 'bpi',]
