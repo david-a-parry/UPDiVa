@@ -95,10 +95,14 @@ def plot_upd(df, sample, chrom, out_dir, w=1000000, fig_dimensions=(12, 6),
     plt.close('all')
 
 def data_to_plots(sample_file, pos_file, out_dir, min_fraction, window_size,
-                  sig_self, sig_chrom, samples, chromosomes, marker=None):
+                  sig_self, sig_chrom, samples, chromosomes, plot_all=False,
+                  marker=None):
     sys.stderr.write("Reading data...\n")
     pos_state = pd.read_table(pos_file, names=["chrom", "pos", "Sample",
                                                "state"])
+    if plot_all:
+        samples = list(pos_state.Sample.unique())
+        chromosomes = list(pos_state.chrom.unique())
     sample_upd = pd.read_table(sample_file)
     if not samples and not chromosomes: #do all 'significant' sample vs chroms
         sigs = sample_upd[(sample_upd['Test'] != 'Homozygosity') &
@@ -122,7 +126,7 @@ def data_to_plots(sample_file, pos_file, out_dir, min_fraction, window_size,
 def main(sample_file, coordinate_table, output_directory, min_fraction=0.05,
          window_size=1e6, self_significance_cutoff=1e-5,
          chrom_significance_cutoff=1e-5, samples=[], chromosomes=[],
-         context='talk', marker=None, force=False):
+         plot_all=False, context='talk', marker=None, force=False):
     sns.set_context(context)
     sns.set_style('darkgrid')
     if not os.path.isdir(output_directory):
@@ -130,9 +134,11 @@ def main(sample_file, coordinate_table, output_directory, min_fraction=0.05,
     elif not force:
         sys.exit("Output directory '{}' exists ".format(output_directory) +
                  "- use --force to overwrite")
-    data_to_plots(sample_file, coordinate_table, output_directory,
-                  min_fraction, window_size, self_significance_cutoff,
-                  chrom_significance_cutoff, samples, chromosomes, marker)
+    data_to_plots(sample_file=sample_file, pos_file=coordinate_table,
+                  out_dir=output_directory, min_fraction=min_fraction,
+                  window_size=window_size, sig_self=self_significance_cutoff,
+                  sig_chrom=chrom_significance_cutoff, samples=samples,
+                  chromosomes=chromosomes, marker=marker, plot_all=plot_all)
 
 def get_parser():
     parser = argparse.ArgumentParser(
@@ -166,6 +172,9 @@ def get_parser():
     parser.add_argument("--chromosomes", nargs='+', help='''Plot these
                         chromosomes (only) irrespective of significance
                         thresholds.''')
+    parser.add_argument("--plot_all", action='store_true', help='''Plot all
+                        chromosomes for all samples irrespective of
+                        significance thresholds.''')
     parser.add_argument("--context", default='talk',  help='''Seaborn context
                         type (e.g. 'paper', 'talk', 'poster', 'notebook') for
                         setting the plotting context. Default=talk''')
