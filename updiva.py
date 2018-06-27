@@ -17,7 +17,7 @@ from copy import copy
 from parse_vcf import VcfReader
 from vase.ped_file import PedFile
 
-chrom_re = re.compile(r'''^(chr)?[1-9][0-9]?$''')
+chrom_re = re.compile(r'''^(chr)?[1-9X][0-9]?$''')
 
 gt_ids = [#counts for testing for excess homozygosity
           'het', 'hom_alt', 'hom_ref',
@@ -65,20 +65,22 @@ def main(vcf, ped=None, output=None, coordinate_table=None, threads=1,
          progress_interval=10000):
     parents = None
     children = set()
+    females = set()
     samples = None
     logger = get_logger()
     if coordinate_table and not coordinate_table.endswith(".gz"):
         coordinate_table += '.gz'
     if ped is not None:
         logger.info("Parsing PED file.")
-        samples, parents, children = samples_from_ped(ped, vcf, logger)
+        samples, parents, children, females = samples_from_ped(ped, vcf,
+                                                               logger)
     else:
         logger.info("No PED file - analyzing all samples for homozygosity " +
                     "only")
         samples = VcfReader(vcf).header.samples
     kwargs = {'vcf': vcf, 'prog_interval': progress_interval,
               'coordinate_table': coordinate_table, 'samples': samples,
-              'parents': parents, 'children': children}
+              'parents': parents, 'children': children, 'females': females}
     if threads > 1:
         contig_args = ({'contig': x} for x in get_seq_ids(vcf))
         if not contig_args:
@@ -102,10 +104,9 @@ def main(vcf, ped=None, output=None, coordinate_table=None, threads=1,
         if coordinate_table:
             copyfile(tmp_table, coordinate_table)
     logger.info("Parsing results.")
-    parse_results(results, logger, children, output)
+    parse_results(results, logger, children, females, output)
 
-def parse_results(gt_counts, logger, children, output=None):
-    #TODO - address chrX in females
+def parse_results(gt_counts, logger, children, females, output=None):
     if output is None:
         out = sys.stdout
     else:
@@ -121,8 +122,6 @@ def parse_results(gt_counts, logger, children, output=None):
     het_i = gt_indices['het'] #for readability
     genome_all_upd = get_upd_counts(genomewide_counts, gt_indices)
     for chrom in gt_counts.counts:
-        if "X" in chrom:
-            continue
         logger.info("Parsing results for chomosome {}".format(chrom))
         chrom_total = np.sum(gt_counts.counts[chrom][:2])
         chrom_all_hom = chrom_total - np.sum(gt_counts.counts[chrom][het_i])
@@ -130,11 +129,13 @@ def parse_results(gt_counts, logger, children, output=None):
         chrom_upd = get_upd_counts(gt_counts.counts[chrom], gt_indices)
         chrom_upd_totals = dict((k, np.sum(chrom_upd[k])) for k in upd_types)
         for sample in gt_counts.samples:
+            if 'X' in chrom and sample not in females:
+                continue
             i = gt_counts.samp_indices[sample]
             samp_genomewide_total = np.sum(genomewide_counts[:2,i])
             samp_hom_total = (samp_genomewide_total -
                               np.sum(gt_counts.counts[c][het_i,i] for c in
-                                     gt_counts.counts if "X" not in c))
+                                     gt_counts.counts))
             samp_chrom_total = np.sum(gt_counts.counts[chrom][:2,i])
             samp_chrom_hom = (samp_chrom_total -
                               gt_counts.counts[chrom][het_i,i])
@@ -246,8 +247,8 @@ def initialize_mp_logger(logger, loglevel, logfile=None):
         logger.addHandler(fh)
 
 def get_gt_counts(vcf, samples, coordinate_table=None, parents=None,
-                  children=set(), contig=None, prog_interval=10000,
-                  logger=None, loglevel=logging.INFO):
+                  children=set(), females= set(), contig=None, 
+                  prog_interval=10000, logger=None, loglevel=logging.INFO):
     vreader = VcfReader(vcf)
     table_fn = None
     if coordinate_table:
@@ -296,6 +297,8 @@ def get_gt_counts(vcf, samples, coordinate_table=None, parents=None,
                 sgt = 'hom_ref'
             else:
                 continue
+            if 'X' in record.CHROM and s not in females:
+                continue
             gt_counter.count_genotype(record.CHROM, s, sgt)
             if s in children:
                 disomy = upd(gts, s, parents[s]['mother'],
@@ -317,6 +320,7 @@ def samples_from_ped(ped, vcf, logger):
     parents = defaultdict(dict)
     samples = []
     children = []
+    females = []
     pedfile = PedFile(ped)
     vreader = VcfReader(vcf)
     for iid, indv in pedfile.individuals.items():
@@ -324,6 +328,8 @@ def samples_from_ped(ped, vcf, logger):
             logger.warn("Skipping individual {} - not in VCF".format(iid))
             continue
         samples.append(iid)
+        if indv.is_female():
+            females.append(iid)
         for p in ['mother', 'father']:
             parents[iid][p] = (getattr(indv, p) if getattr(indv, p) in
                                vreader.header.samples else None)
@@ -332,7 +338,7 @@ def samples_from_ped(ped, vcf, logger):
     children = set(x for x in parents if parents[x]['mother'] is not None and
                    parents[x]['father'] is not None)
     logger.info("Got {} parent-child trios from PED".format(len(children)))
-    return samples, parents, children
+    return samples, parents, children, females
 
 def gt_passes_filters(gts, s, min_gq=20, min_dp=10, min_ab=0.25):
     if gts['GQ'][s] is None or gts['GQ'][s] < min_gq:
