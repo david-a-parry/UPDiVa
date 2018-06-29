@@ -198,6 +198,7 @@ def main(sample_file, coordinate_table, output_directory, min_fraction=0.05,
         else:
             sys.exit("No centromere file ({}) for build {}".format(cfile,
                                                                    build))
+    highlight_regions = dict()
     if roi is not None:
         highlight_regions = read_roi_bed(roi)
     if not os.path.isdir(output_directory):
