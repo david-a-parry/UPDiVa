@@ -54,7 +54,7 @@ def add_highlight_to_plot(plt, region, color='black', pivot_table=None):
     if pivot_table is not None:
         fpos = pivot_table.iloc[0]
         l = bisect.bisect_left(fpos.keys(), float(start)/1e6)
-        r = bisect.bisect_left(fpos.keys(), float(end)/1e6)
+        r = bisect.bisect_right(fpos.keys(), float(end)/1e6)
         plt.plot([l, l], [0, 5], '--', color=color, alpha=0.5)
         plt.plot([r, r], [0, 5], '--', color=color, alpha=0.5)
     else:
