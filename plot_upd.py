@@ -8,6 +8,7 @@ if os.environ.get('DISPLAY','') == '':
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
+import bisect
 from collections import defaultdict
 
 valid_states = ['mat_i_upd', 'mat_a_upd', 'pat_i_upd', 'pat_a_upd', 'bpi',]
@@ -44,8 +45,26 @@ def states_per_region(df, chrom, sample, w=1000000 ):
             counts['Calls'].append(len(window))
     return pd.DataFrame(counts)
 
+def add_highlight_to_plot(plt, region, color='black', pivot_table=None):
+    start = region[0]
+    end = region[1]
+    label = None
+    if len(region) > 2:
+        label = region[2]
+    if pivot_table is not None:
+        fpos = pivot_table.iloc[0]
+        l = bisect.bisect_left(fpos.keys(), float(start)/1e6)
+        r = bisect.bisect_left(fpos.keys(), float(end)/1e6)
+        plt.plot([l, l], [0, 5], '--', color=color, alpha=0.5)
+        plt.plot([r, r], [0, 5], '--', color=color, alpha=0.5)
+    else:
+        plt.plot([float(start)/1e6, float(start)/1e6], [0, 1], '--',
+                 color=color, label=label, alpha=0.5)
+        plt.plot([float(end)/1e6, float(end)/1e6], [0, 1], '--', color=color,
+                 alpha=0.5)
+
 def plot_upd(df, sample, chrom, out_dir, w=1000000, fig_dimensions=(12, 6),
-             marker=None):
+             marker=None, centromeres=dict(), roi=dict()):
     sys.stderr.write("Processing sample {} chromosome {}...\n".format(sample,
                                                                       chrom))
     states = states_per_region(df, sample=sample, chrom=chrom, w=w)
@@ -68,6 +87,12 @@ def plot_upd(df, sample, chrom, out_dir, w=1000000, fig_dimensions=(12, 6),
         s = states[states.State == valid_states[i]]
         plt.plot(s.Pos, s.Frac, color=colors[i],
                  label=lbls[valid_states[i]],  marker=marker)
+    if chrom in centromeres:
+        add_highlight_to_plot(plt, centromeres[chrom], color='black')
+    if chrom in roi and len(roi[chrom]) > 0:
+        pal = sns.color_palette("Set2", len(roi[chrom]))
+        for region, col in zip(roi[chrom], pal):
+            add_highlight_to_plot(plt, region, color=col)
     plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
     plt.title("States")
     plt.xlabel("Pos (Mb)")
@@ -80,6 +105,13 @@ def plot_upd(df, sample, chrom, out_dir, w=1000000, fig_dimensions=(12, 6),
     ax.yaxis.set_visible(False)
     fig.add_subplot(grid[1, 0],)
     pivot = states.pivot("State", "Pos", "Frac")
+    if chrom in centromeres:
+        add_highlight_to_plot(plt, centromeres[chrom], color='white',
+                              pivot_table=pivot)
+    if chrom in roi and len(roi[chrom]) > 0:
+        pal = sns.color_palette("Set2", len(roi[chrom]))
+        for region, col in zip(roi[chrom], pal):
+            add_highlight_to_plot(plt, region, color=col, pivot_table=pivot)
     ax = sns.heatmap(pivot)
     ax.set_title("States")
     xticklabels = []
@@ -98,7 +130,7 @@ def plot_upd(df, sample, chrom, out_dir, w=1000000, fig_dimensions=(12, 6),
 
 def data_to_plots(sample_file, pos_file, out_dir, min_fraction, window_size,
                   sig_self, sig_chrom, samples, chromosomes, plot_all=False,
-                  marker=None):
+                  marker=None, roi=dict(), centromeres=dict()):
     sys.stderr.write("Reading data...\n")
     pos_state = pd.read_table(pos_file, names=["chrom", "pos", "Sample",
                                                "state"])
@@ -114,7 +146,8 @@ def data_to_plots(sample_file, pos_file, out_dir, min_fraction, window_size,
         for s in sigs.Sample.unique():
             for c in sigs[sigs.Sample == s].Chrom.unique():
                 plot_upd(pos_state, sample=s, chrom=c, out_dir=out_dir,
-                         marker=marker, w=window_size)
+                         marker=marker, w=window_size, centromeres=centromeres,
+                         roi=roi)
     else:
         if not samples:
             samples = pos_state.Sample.unique()
@@ -123,14 +156,50 @@ def data_to_plots(sample_file, pos_file, out_dir, min_fraction, window_size,
         for s in samples:
             for c in chromosomes:
                 plot_upd(pos_state, sample=s, chrom=c, out_dir=out_dir,
-                         marker=marker, w=window_size)
+                         marker=marker, w=window_size, centromeres=centromeres,
+                         roi=roi)
+
+def read_roi_bed(bedfile):
+    roi = defaultdict(list)
+    with open(bedfile, 'rt') as infile:
+        for line in infile:
+            cols = line.split()
+            if len(cols) < 3:
+                sys.exit("Not enough columns in bed for {}".format(bedfile))
+            region = [int(cols[1]) + 1, int(cols[2])]
+            if len(cols) > 3:
+                region.append(cols[3])
+            roi[cols[0]].append(region)
+    return roi
+
+def read_centromere_bed(bedfile):
+    centromeres = dict()
+    with open(bedfile, 'rt') as infile:
+        for line in infile:
+            cols = line.split()
+            if len(cols) < 3:
+                sys.exit("Not enough columns in bed for {}".format(bedfile))
+            centromeres[cols[0]] = (int(cols[1]) + 1, int(cols[2]))
+    return centromeres
 
 def main(sample_file, coordinate_table, output_directory, min_fraction=0.05,
          window_size=1e6, self_significance_cutoff=1e-5,
          chrom_significance_cutoff=1e-5, samples=[], chromosomes=[],
-         plot_all=False, context='talk', marker=None, force=False):
+         build=None, roi=None, plot_all=False, context='talk', marker=None,
+         force=False):
     sns.set_context(context)
     sns.set_style('darkgrid')
+    centromeres = dict()
+    if build is not None:
+        cfile = os.path.join(os.path.dirname(__file__), "data",
+                             build + "_centromeres.bed")
+        if os.path.exists(cfile):
+            centromeres = read_centromere_bed(cfile)
+        else:
+            sys.exit("No centromere file ({}) for build {}".format(cfile,
+                                                                   build))
+    if roi is not None:
+        highlight_regions = read_roi_bed(roi)
     if not os.path.isdir(output_directory):
         os.mkdir(output_directory)
     elif not force:
@@ -140,7 +209,8 @@ def main(sample_file, coordinate_table, output_directory, min_fraction=0.05,
                   out_dir=output_directory, min_fraction=min_fraction,
                   window_size=window_size, sig_self=self_significance_cutoff,
                   sig_chrom=chrom_significance_cutoff, samples=samples,
-                  chromosomes=chromosomes, marker=marker, plot_all=plot_all)
+                  chromosomes=chromosomes, marker=marker, plot_all=plot_all,
+                  roi=highlight_regions, centromeres=centromeres)
 
 def get_parser():
     parser = argparse.ArgumentParser(
@@ -183,6 +253,14 @@ def get_parser():
     parser.add_argument("-m", "--marker", help='''Use this marker style for
                         individual points in plots. Default=None (no markers).
                         Valid values are as per matplotlib.''')
+    parser.add_argument("-b", "--build", help='''Genome build. If specified,
+                        centromeres will be marked if there is a corresponding
+                        BED file of centromere locations in the 'data'
+                        subdirectory (hg19, hg38, GRCh37, GRCh38 available by
+                        default).''')
+    parser.add_argument("-r", "--roi", help='''BED file of regions of interest.
+                        If a 4th column is present this will be used to label
+                        these regions.''')
     parser.add_argument("--force", action='store_true', help='''Overwrite
                         existing output directories.''')
     return parser
