@@ -140,8 +140,8 @@ def data_to_plots(sample_file, pos_file, out_dir, min_fraction, window_size,
     sample_upd = pd.read_table(sample_file)
     if not samples and not chromosomes: #do all 'significant' sample vs chroms
         sigs = sample_upd[(sample_upd['Test'] != 'Homozygosity') &
-                          (sample_upd['vs_chrom'] < sig_self) &
-                          (sample_upd['vs_self'] < sig_chrom) &
+                          (sample_upd['vs_chrom'] < sig_chrom) &
+                          (sample_upd['vs_self'] < sig_self) &
                           (sample_upd['Fraction'] > min_fraction)]
         for s in sigs.Sample.unique():
             for c in sigs[sigs.Sample == s].Chrom.unique():
