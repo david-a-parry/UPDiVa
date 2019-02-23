@@ -398,7 +398,7 @@ def get_parser():
     parser = argparse.ArgumentParser(
                   description='Identify putative UPD chromosomes in samples.')
     required_args = parser.add_argument_group('Required Arguments')
-    optional_args = parser.add_argument_group('Required Arguments')
+    optional_args = parser.add_argument_group('Optional Arguments')
     required_args.add_argument("-i", "--vcf", "--input", required=True,
                                help="Input VCF file.")
     optional_args.add_argument("-p", "--ped", help='''PED file detailing any
