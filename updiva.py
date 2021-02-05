@@ -10,7 +10,7 @@ import tempfile
 import scipy.stats
 import multiprocessing as mp
 import numpy as np
-from shutil import copyfile,copyfileobj
+from shutil import copyfile, copyfileobj
 from itertools import repeat
 from collections import defaultdict
 from copy import copy
@@ -19,18 +19,20 @@ from vase.ped_file import PedFile
 
 chrom_re = re.compile(r'''^(chr)?[1-9X][0-9]?$''')
 
-gt_ids = [#counts for testing for excess homozygosity
+gt_ids = [
+          # counts for testing for excess homozygosity
           'het', 'hom_alt', 'hom_ref',
           # counts for UPD - bi-parental, mat/paternal isodisomy, heterodisomy
           'bpi', 'mat_i_upd', 'mat_a_upd', 'pat_i_upd', 'pat_a_upd'
          ]
 
+
 class GtCounter(object):
     ''' Count number of hets/homs per contig for a sample.'''
 
     def __init__(self, samples, counts=dict()):
-        self.samp_indices = dict((s, n) for n,s in enumerate(samples))
-        self.gt_indices = dict((r, n) for n,r in enumerate(gt_ids))
+        self.samp_indices = dict((s, n) for n, s in enumerate(samples))
+        self.gt_indices = dict((r, n) for n, r in enumerate(gt_ids))
         self.counts = counts
         self.samples = samples
 
@@ -56,10 +58,12 @@ class GtCounter(object):
                                           dtype=int)
         self.counts[chrom][self.gt_indices[gt], self.samp_indices[sample]] += 1
 
+
 def _process_runner(tup):
     kwargs1, kwargs2 = tup
     kwargs2.update(kwargs1)
     return get_gt_counts(**kwargs2)
+
 
 def main(vcf, ped=None, output=None, coordinate_table=None, threads=1,
          progress_interval=10000):
@@ -100,11 +104,12 @@ def main(vcf, ped=None, output=None, coordinate_table=None, threads=1,
                         copyfileobj(rfh, wfh)
     else:
         kwargs['logger'] = logger
-        results,tmp_table = get_gt_counts(**kwargs)
+        results, tmp_table = get_gt_counts(**kwargs)
         if coordinate_table:
             copyfile(tmp_table, coordinate_table)
     logger.info("Parsing results.")
     parse_results(results, logger, children, females, output)
+
 
 def parse_results(gt_counts, logger, children, females, output=None):
     if output is None:
@@ -113,13 +118,13 @@ def parse_results(gt_counts, logger, children, females, output=None):
         out = open(output, 'wt')
     genomewide_counts = sum(gt_counts.counts[c] for c in gt_counts.counts if
                             "X" not in c)
-    gt_indices = dict((r, n) for n,r in enumerate(gt_ids))
+    gt_indices = dict((r, n) for n, r in enumerate(gt_ids))
     upd_types = ('mat_upd', 'mat_i_upd', 'pat_upd', 'pat_i_upd')
     out.write("\t".join(["Sample", "Chrom", "Test", "N", "Calls", "Fraction",
-                     "vs_chrom", "vs_self"]) + "\n")
+                         "vs_chrom", "vs_self"]) + "\n")
     logger.info("Calculating genomewide total")
-    genome_all_total = np.sum(genomewide_counts[:2]) #does not include hom-ref
-    het_i = gt_indices['het'] #for readability
+    genome_all_total = np.sum(genomewide_counts[:2])  # does not include homref
+    het_i = gt_indices['het']  # for readability
     genome_all_upd = get_upd_counts(genomewide_counts, gt_indices)
     for chrom in gt_counts.counts:
         logger.info("Parsing results for chomosome {}".format(chrom))
@@ -132,13 +137,13 @@ def parse_results(gt_counts, logger, children, females, output=None):
             if 'X' in chrom and sample not in females:
                 continue
             i = gt_counts.samp_indices[sample]
-            samp_genomewide_total = np.sum(genomewide_counts[:2,i])
+            samp_genomewide_total = np.sum(genomewide_counts[:2, i])
             samp_hom_total = (samp_genomewide_total -
-                              np.sum(gt_counts.counts[c][het_i,i] for c in
+                              np.sum(gt_counts.counts[c][het_i, i] for c in
                                      gt_counts.counts))
-            samp_chrom_total = np.sum(gt_counts.counts[chrom][:2,i])
+            samp_chrom_total = np.sum(gt_counts.counts[chrom][:2, i])
             samp_chrom_hom = (samp_chrom_total -
-                              gt_counts.counts[chrom][het_i,i])
+                              gt_counts.counts[chrom][het_i, i])
             samp_vs_chrom = scipy.stats.binom_test(samp_chrom_hom,
                                                    samp_chrom_total,
                                                    chrom_all_hom/chrom_total,
@@ -150,9 +155,10 @@ def parse_results(gt_counts, logger, children, females, output=None):
                     alternative='greater')
             frac = "{:.3g}".format(samp_chrom_hom/samp_chrom_total)
             out.write("\t".join(str(x) for x in [sample, chrom, 'Homozygosity',
-                                             samp_chrom_hom, samp_chrom_total,
-                                             frac, samp_vs_chrom,
-                                             samp_vs_self]) + "\n")
+                                                 samp_chrom_hom,
+                                                 samp_chrom_total,
+                                                 frac, samp_vs_chrom,
+                                                 samp_vs_self]) + "\n")
             if sample in children:
                 samp_informative_total = np.sum(np.sum(genomewide_counts[3:,i]))
                 samp_chrom_informative = np.sum(gt_counts.counts[chrom][3:,i])
@@ -179,10 +185,11 @@ def parse_results(gt_counts, logger, children, females, output=None):
                     frac = "{:.3g}".format(
                             samp_upd_chrom[utype]/samp_chrom_informative)
                     out.write("\t".join(str(x) for x in [sample, chrom, utype,
-                                                     samp_upd_chrom[utype],
-                                                     samp_chrom_informative,
-                                                     frac, samp_vs_chrom,
-                                                     samp_vs_self]) + "\n")
+                                                         samp_upd_chrom[utype],
+                                                         samp_chrom_informative,
+                                                         frac, samp_vs_chrom,
+                                                         samp_vs_self]) + "\n")
+
 
 def get_upd_counts(counts, gt_rows):
     '''
@@ -200,6 +207,7 @@ def get_upd_counts(counts, gt_rows):
     return {'mat_upd': mat_upd, 'mat_i_upd': counts[gt_rows['mat_i_upd']],
             'pat_upd': pat_upd, 'pat_i_upd': counts[gt_rows['pat_i_upd']]}
 
+
 def get_seq_ids(vcf):
     if vcf.endswith(".bcf"):
         idx = vcf + '.csi'
@@ -207,7 +215,7 @@ def get_seq_ids(vcf):
     else:
         idx = vcf + '.tbi'
         preset = 'vcf'
-    if not os.path.isfile(idx):   #create index if it doesn't exist
+    if not os.path.isfile(idx):   # create index if it doesn't exist
         pysam.tabix_index(vcf, preset=preset)
     if preset == 'bcf':
         vf = pysam.VariantFile(vcf)
@@ -215,6 +223,7 @@ def get_seq_ids(vcf):
     else:
         tbx = pysam.TabixFile(vcf)
         return (c for c in tbx.contigs if chrom_re.match(c))
+
 
 def get_logger(loglevel=logging.INFO, logfile=None):
     logger = logging.getLogger("UPD")
@@ -232,6 +241,7 @@ def get_logger(loglevel=logging.INFO, logfile=None):
         logger.addHandler(fh)
     return logger
 
+
 def initialize_mp_logger(logger, loglevel, logfile=None):
     logger.setLevel(loglevel)
     ch = logging.StreamHandler()
@@ -246,8 +256,9 @@ def initialize_mp_logger(logger, loglevel, logfile=None):
         fh.setFormatter(formatter)
         logger.addHandler(fh)
 
+
 def get_gt_counts(vcf, samples, coordinate_table=None, parents=None,
-                  children=set(), females= set(), contig=None, 
+                  children=set(), females=set(), contig=None,
                   prog_interval=10000, logger=None, loglevel=logging.INFO):
     vreader = VcfReader(vcf)
     table_fn = None
@@ -275,9 +286,9 @@ def get_gt_counts(vcf, samples, coordinate_table=None, parents=None,
                         " {:,} filtered at {}:{}".format(n - valid,
                                                          record.CHROM,
                                                          record.POS))
-        if len(record.ALLELES) != 2: #biallelic only
+        if len(record.ALLELES) != 2:  # biallelic only
             continue
-        if len(record.REF) != 1 or len(record.ALT) != 1: #SNVs only
+        if len(record.REF) != 1 or len(record.ALT) != 1:  # SNVs only
             continue
         if contig is None and not chrom_re.match(record.CHROM):
             continue
@@ -286,7 +297,7 @@ def get_gt_counts(vcf, samples, coordinate_table=None, parents=None,
         valid += 1
         gts = record.parsed_gts(fields=gt_fields, samples=samples)
         for s in samples:
-            #filter on GQ/DP
+            # filter on GQ/DP
             if not gt_passes_filters(gts, s):
                 continue
             if gts['GT'][s] == (0, 1) or gts['GT'][s] == (1, 0):
@@ -307,14 +318,15 @@ def get_gt_counts(vcf, samples, coordinate_table=None, parents=None,
                     gt_counter.count_genotype(record.CHROM, s, disomy)
                     if table_fn:
                         gzf.write("\t".join(str(x) for x in [record.CHROM,
-                                                            record.POS, s,
-                                                            disomy]) + "\n")
+                                                             record.POS, s,
+                                                             disomy]) + "\n")
 
     if contig is not None:
         logger.info("Finished processing chromosome {}".format(contig))
     if table_fn:
         gzf.close()
     return gt_counter, table_fn
+
 
 def samples_from_ped(ped, vcf, logger):
     parents = defaultdict(dict)
@@ -333,12 +345,13 @@ def samples_from_ped(ped, vcf, logger):
         for p in ['mother', 'father']:
             parents[iid][p] = (getattr(indv, p) if getattr(indv, p) in
                                vreader.header.samples else None)
-    #only trios currently supported, but could tweak to be able to parse
-    #parent-child duos
+    # only trios currently supported, but could tweak to be able to parse
+    # parent-child duos
     children = set(x for x in parents if parents[x]['mother'] is not None and
                    parents[x]['father'] is not None)
     logger.info("Got {} parent-child trios from PED".format(len(children)))
     return samples, parents, children, females
+
 
 def gt_passes_filters(gts, s, min_gq=20, min_dp=10, min_ab=0.25):
     if gts['GQ'][s] is None or gts['GQ'][s] < min_gq:
@@ -354,6 +367,7 @@ def gt_passes_filters(gts, s, min_gq=20, min_dp=10, min_ab=0.25):
             if ab < min_ab:
                 return False
     return True
+
 
 def upd(gts, sample, mother, father):
     if mother is not None and not gt_passes_filters(gts, mother):
@@ -392,7 +406,8 @@ def upd(gts, sample, mother, father):
             return 'pat_a_upd'
         if gts['GT'][father] == (0, 1) or gts['GT'][father] == (1, 0):
             return 'pat_i_upd'
-    return False #uninformative
+    return False  # uninformative
+
 
 def get_parser():
     parser = argparse.ArgumentParser(
@@ -419,6 +434,7 @@ def get_parser():
                                metavar='N', help='''Report progress every N
                                variants.''')
     return parser
+
 
 if __name__ == '__main__':
     argparser = get_parser()
