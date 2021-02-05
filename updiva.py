@@ -84,7 +84,7 @@ def main(vcf, ped=None, output=None, coordinate_table=None, threads=1,
     if threads > 1:
         contig_args = ({'contig': x} for x in get_seq_ids(vcf))
         if not contig_args:
-            raise RuntimeError("No valid contigs identified in {}".format(fai))
+            raise RuntimeError("No valid contigs identified in {}".format(vcf)
         with mp.Pool(threads) as p:
             pool_results = p.map(_process_runner, zip(contig_args,
                                                       repeat(kwargs)))
